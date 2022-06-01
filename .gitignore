@@ -1,0 +1,14 @@
+.ipynb_checkpoints
+.vscode
+__pycache__
+.coverage
+htmlcov/
+build/
+*.egg-info/
+dist/
+.DS_Store
+bin/
+!bin/.gitkeep
+work/
+*.log
+
