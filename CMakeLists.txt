@@ -21,58 +21,39 @@ endif ()
 # get external source files
 file(
   GLOB MIS_SRC
-  pace-2019/lib/*/*.h
-  pace-2019/lib/*/*.cpp
-  pace-2019/lib/*/*/*.h
-  pace-2019/lib/*/*/*.cpp
-  pace-2019/extern/KaHIP/lib/tools/random_functions.h
-  pace-2019/extern/KaHIP/lib/tools/random_functions.cpp
+  src/pace-2019/lib/*/*.h
+  src/pace-2019/lib/*/*.cpp
+  src/pace-2019/lib/*/*/*.h
+  src/pace-2019/lib/*/*/*.cpp
+  src/pace-2019/extern/KaHIP/lib/tools/random_functions.h
+  src/pace-2019/extern/KaHIP/lib/tools/random_functions.cpp
 )
 
 include_directories(
-  pace-2019/extern/KaHIP/interface
-  pace-2019/extern/KaHIP/lib
-  pace-2019/extern/KaHIP/lib/data_structure
-  pace-2019/extern/KaHIP/lib/io
-  pace-2019/extern/KaHIP/lib/tools
-  pace-2019/extern/cliqueSolver
-  pace-2019/lib
-  pace-2019/lib/tools
-  pace-2019/lib/mis
-  pace-2019/lib/mis/initial_mis
-  pace-2019/lib/mis/evolutionary
-  pace-2019/lib/mis/ils
-  pace-2019/extern/KaHIP/lib/partition
+  src/pace-2019/extern/KaHIP/interface
+  src/pace-2019/extern/KaHIP/lib
+  src/pace-2019/extern/KaHIP/lib/data_structure
+  src/pace-2019/extern/KaHIP/lib/io
+  src/pace-2019/extern/KaHIP/lib/tools
+  src/pace-2019/extern/cliqueSolver
+  src/pace-2019/lib
+  src/pace-2019/lib/tools
+  src/pace-2019/lib/mis
+  src/pace-2019/lib/mis/initial_mis
+  src/pace-2019/lib/mis/evolutionary
+  src/pace-2019/lib/mis/ils
+  src/pace-2019/extern/KaHIP/lib/partition
 )
 
 # get all source files
-if (BUILD_DEV)
-  file(GLOB_RECURSE DFVS_SRC main/solver_dev.cpp main/*/*.[ch]pp)
-else ()
-  file(GLOB_RECURSE DFVS_SRC main/solver.cpp main/*/*.[ch]pp)
-endif ()
-
-file(GLOB_RECURSE VERIFY_SRC
-  main/verifier.cpp
-  main/algorithm/component.[ch]pp
-  main/data/*.[ch]pp
-  main/readwrite/*.[ch]pp
-  main/util/*.[ch]pp
-)
+file(GLOB_RECURSE DFVS_SRC src/main/solver.cpp src/main/*/*.[ch]pp)
 
 # project
 project(DFVS)
 add_executable(dfvs ${DFVS_SRC} ${MIS_SRC})
 
 set(CMAKE_CXX_FLAGS "-Wall -funroll-loops -fno-stack-limit -O3")
-# set(CMAKE_EXE_LINKER_FLAGS "")
-
-if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-    set (CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-    set (CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-else ()
-  set (CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-endif ()
+set (CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 
 if (NOT DEFINED BUILD_DEV)
   set(BUILD_DEV false)
