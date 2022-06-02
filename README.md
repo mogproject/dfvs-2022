@@ -29,4 +29,4 @@ make build
 
 And the executable file `dfvs` will be generated under the `dist` directory.
 
-Notes: A submission file (`dist/dfvs.tgz`) can be created by `make publish`.
+Note: A submission file (`dist/dfvs.tgz`) can be created by `make publish`.
