@@ -1,0 +1,263 @@
+
+\documentclass[a4paper,UKenglish,cleveref, autoref, thm-restate]{lipics-v2021}
+%This is a template for producing LIPIcs articles. 
+%See lipics-v2021-authors-guidelines.pdf for further information.
+%for A4 paper format use option "a4paper", for US-letter use option "letterpaper"
+%for british hyphenation rules use option "UKenglish", for american hyphenation rules use option "USenglish"
+%for section-numbered lemmas etc., use "numberwithinsect"
+%for enabling cleveref support, use "cleveref"
+%for enabling autoref support, use "autoref"
+%for anonymousing the authors (e.g. for double-blind review), add "anonymous"
+%for enabling thm-restate support, use "thm-restate"
+%for enabling a two-column layout for the author/affilation part (only applicable for > 6 authors), use "authorcolumns"
+%for producing a PDF according the PDF/A standard, add "pdfa"
+
+%\graphicspath{{./graphics/}}%helpful if your graphic files are in another directory
+
+\bibliographystyle{plainurl}% the mandatory bibstyle
+
+\title{PACE 2022 Solver Description: An Exact Solver for Directed Feedback Vertex Set} %TODO Please add
+
+% \titlerunning{PACE 2022 Solver Description} %TODO optional, please use if title is longer than one line
+
+
+\newcommand{\universityOfUtah}{School of Computing, University of Utah, USA}
+\author{Yosuke Mizutani}{\universityOfUtah}{yos@cs.utah.edu}{https://orcid.org/0000-0002-9847-4890}{}
+
+\authorrunning{Y. Mizutani} %TODO mandatory. First: Use abbreviated first/middle names. Second (only in severe cases): Use first author plus 'et al.'
+
+\Copyright{Yosuke Mizutani} %TODO mandatory, please use full first names. LIPIcs license is "CC-BY";  http://creativecommons.org/licenses/by/3.0/
+
+\ccsdesc[100]{Theory of computation → Graph algorithms analysis} %TODO mandatory: Please choose ACM 2012 classifications from https://dl.acm.org/ccs/ccs_flat.cfm 
+
+\keywords{Directed feedback vertex set, PACE 2022} %TODO mandatory; please add comma-separated list of keywords
+
+\category{} %optional, e.g. invited paper
+
+\relatedversion{} %optional, e.g. full version hosted on arXiv, HAL, or other respository/website
+%\relatedversiondetails[linktext={opt. text shown instead of the URL}, cite=DBLP:books/mk/GrayR93]{Classification (e.g. Full Version, Extended Version, Previous Version}{URL to related version} %linktext and cite are optional
+
+\supplement{
+    Code submitted to the competition: \url{https://doi.org/10.5281/zenodo.6604875}.
+    Code repository on GitHub: \url{https://github.com/mogproject/dfvs-2022}
+}
+%optional, e.g. related research data, source code, ... hosted on a repository like zenodo, figshare, GitHub, ...
+%\supplementdetails[linktext={opt. text shown instead of the URL}, cite=DBLP:books/mk/GrayR93, subcategory={Description, Subcategory}, swhid={Software Heritage Identifier}]{General Classification (e.g. Software, Dataset, Model, ...)}{URL to related version} %linktext, cite, and subcategory are optional
+
+%\funding{(Optional) general funding statement \dots}%optional, to capture a funding statement, which applies to all authors. Please enter author specific funding statements as fifth argument of the \author macro.
+
+%\acknowledgements{I want to thank \dots}%optional
+
+%\nolinenumbers %uncomment to disable line numbering
+
+\hideLIPIcs  %uncomment to remove references to LIPIcs series (logo, DOI, ...), e.g. when preparing a pre-final version to be uploaded to arXiv or another public repository
+
+%Editor-only macros:: begin (do not touch as author)%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% \EventEditors{John Q. Open and Joan R. Access}
+% \EventNoEds{2}
+% \EventLongTitle{42nd Conference on Very Important Topics (CVIT 2016)}
+% \EventShortTitle{CVIT 2016}
+% \EventAcronym{CVIT}
+% \EventYear{2016}
+% \EventDate{December 24--27, 2016}
+% \EventLocation{Little Whinging, United Kingdom}
+% \EventLogo{}
+% \SeriesVolume{42}
+% \ArticleNo{23}
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\newtheorem{rulex}[theorem]{Rule}
+
+\begin{document}
+
+\maketitle
+
+%TODO mandatory: add short abstract of the document
+\begin{abstract}
+This note describes our submission to the Exact track of PACE 2022:
+ \textsc{Direct Feedback Vertex Set} (\textsc{DFVS})\footnote{%
+\texttt{https://pacechallenge.org/2022/}}.
+Our solver heavily depends on the \textsc{Vertex Cover} solver \textsf{WeGotYouCovered}
+ \cite{hespe2020wegotyoucovered},
+ as we observe that \textsc{DFVS} can be reduced to \textsc{Vertex Cover}
+ if all edges in the given digraph are bidirected.
+%
+Further, our program comprises two phases: the heuristic random search and the exhaustive search.
+The random search \textit{guesses} a high-quality feasible solution via heuristics,
+ and the exhaustive one performs a branch-and-bound search guided by the guess solution.
+\end{abstract}
+
+\section{Background}
+\label{sec:background}
+
+In addition to standard graph-theoretic notation (e.g. found in \cite{diestel2017graph}),
+ we define a few terms.
+Given a directed graph, or a \textit{digraph}, $G=(V,E)$,
+ we say an edge $uv \in E$ is \textit{strong} if bidirected, i.e. $\{uv, vu\} \in E$;
+ otherwise, $uv$ is \textit{weak}.
+Thus, $E$ is partitioned into strong edges, denoted by $E_\text{strong}$,
+ and weak edges, denoted by $E_\text{weak}$.
+%
+Any digraph can be seen as a pair of $(G_\text{strong}, G_\text{weak})$,
+ where $G_\text{strong}$ is an undirected graph $(V,E_\text{strong})$
+ and $G_\text{weak}$ is a digraph $(V,E_\text{weak})$.
+
+Important graph operations in our algorithm include vertex deletion ($G-v$),
+ edge contraction ($G/e$) and vertex ignoring (\textsf{ignore}($v$)),
+ as defined in \cite{levy_contraction_1988} and \cite{hen-ming_lin_computing_2000}.
+%
+The \textsf{ignore} operation adds edges from all in-neighbors of $v$ to all out-neighbors of $v$,
+ and then removes $v$.
+Formally, for a digraph $G=(V,E)$ and a vertex $v \in V$, $\textsf{ignore}(v)$ results in
+ $G' - v$, where $G'=(V, E \cup \{uw: u \in N^-(v), w \in N^+(v) \})$.
+
+Given a digraph $G=(V,E)$,
+ the \textsc{Direct Feedback Vertex Set} (\textsc{DFVS}) problem asks for a smallest vertex set $S \subseteq V$
+ such that $G-S$ is acyclic, that is, the digraph obtained by removing $S$ from $G$ does not contain
+ any directed cycles.
+The \textsc{Vertex Cover} problem is defined as: given an (undirected) graph $G=(V,E)$,
+ find a smallest vertex set $S \subseteq V$ such that for every edge $e \in E$, $e \cap S \neq \emptyset$.
+We relate those problems as follows.
+
+\begin{proposition}\label{thm:1}
+    Given a digraph $G=(V,E)$, its strong and weak graphs $G_\text{strong}=(V,E_\text{strong})$,
+    $G_\text{weak}=(V,E_\text{weak})$, respectively,
+    when $E_\text{weak}=\emptyset$, any solution to \textnormal{\textsc{Vertex Cover}} with $G_\text{strong}$
+    is also a solution to \textnormal{\textsc{DFVS}} with $G$.
+\end{proposition}
+
+We use \cref{thm:1} for two purposes: (1) finding the exact solution when $E_\text{weak}=\emptyset$ and
+ (2) computing the lower-bound of the solution size.
+
+
+\section{Brief Description of Algorithm}
+
+Our solver iteratively applies reduction rules and performs two phases of computation.
+The first phase guesses the best solution quickly;
+ here, we use random search enhanced with local search.
+The second phase performs a branch-and-bound exhaustive search utilizing the guess solution as guidance.
+
+\subsection{Reduction Rules}
+
+We employ all the reduction rules from \cite{levy_contraction_1988} and \cite{hen-ming_lin_computing_2000}.
+It is known that a solution to \textsc{DFVS} with $G$ is the union of each strongly connected component of
+ $G$ \cite{hen-ming_lin_computing_2000},
+ so our reduction process takes a digraph $G$ and returns a set of digraphs $\{G_1,\ldots\}$,
+ possibly adding new vertices to solution.
+
+\begin{itemize}
+    \item \textbf{IN0.} Given a vertex $v$ with in-degree zero, remove $v$.
+    \item \textbf{OUT0.} Given a vertex $v$ with out-degree zero, remove $v$.
+    \item \textbf{LOOP.} Given a vertex $v$ with a self-loop, add $v$ to solution and remove $v$.
+\end{itemize}
+
+The following rules assume $G$ has no self-loops.
+
+\begin{itemize}
+    \item \textbf{IN1.} Given a vertex $v$ with in-degree one, i.e. $N^-(v)=\{u\}$ for $v \neq u$,
+        contract edge $uv$.
+    \item \textbf{OUT1.} Given a vertex $v$ with out-degree one, i.e. $N^+(v)=\{u\}$ for $v \neq u$,
+        contract edge $vu$.
+    \item \textbf{PIE.} Given a weak edge $uv \in E_\text{weak}$ such that $u$ and $v$ are not strongly connected in $G_\text{weak}$,
+        remove $uv$ from $G$.
+    \item \textbf{CORE.} Let $C \subseteq V$ be a clique in $G_\text{strong}$.
+        If there is a vertex $v \in C$ such that $N_G^-(v) \cup N_G^+(v) \subseteq C$, then
+        remove $C \setminus \{v\}$.
+    \item \textbf{DOME.} Given a weak edge $uv \in E_\text{weak}$ such that
+        $N_{G_\text{weak}}^-(u) \subseteq N_G^-(v)$ or
+        $N_{G_\text{weak}}^+(u) \subseteq N_G^+(v)$, remove $uv$.
+\end{itemize}
+
+Additionally, we introduce the following rule underpinned by \cref{thm:1}.
+
+\begin{itemize}
+    \item \textbf{VC.} If $E_\text{weak} = \emptyset$, compute solution to \textsc{Vertex Cover} with $G_\text{strong}$
+    and add it to the solution to \textsc{DFVS}. Then, remove all vertices.
+\end{itemize}
+
+Note that all reduction rules except \textbf{VC} can be performed in polynomial time\footnote{With respect to the graph size.}.
+
+%-------------------------------------------------------------------------------
+%
+%-------------------------------------------------------------------------------
+\subsection{First Phase: Random Search}
+
+In this phase, our solver iteratively picks a vertex or an edge and decides to include them
+ in solution or not (details in the branching section).
+The solver applies reduction rules every time the graph is modified.
+Once a feasible solution to the original instance has been found, it runs a local search to see
+ if there is a better solution.
+Different branching strategies and pseudorandom number generator seeds are tried until the time limit exceeds.
+
+\textbf{Branching.} The solver uses two branching strategies: (1) vertex branching and (2) edge branching.
+Both strategies take two parameters $\sigma \in \{-1,1\}$ and $\mu \in \mathbb{R}$, $0 \leq \mu < 1$.
+Ties are broken randomly.
+%
+The vertex branching picks a vertex $v$ such that $\sigma \cdot \deg_{G_\text{weak}}(v)$ is minimized.
+Then, with probability $\mu$, (1a) include $v$ in the solution and remove $v$, and otherwise, (1b) ignore $v$.
+
+The edge branching first picks a weak edge $uv \in E_\text{weak}$ such that
+ $\sigma (\deg_{G_\text{weak}}(u) + \deg_{G_\text{weak}}(v))$ is minimized.
+Then, with probability $\mu$, (2a) add edge $vu$, and otherwise, (2b) ignore $u$ and $v$.
+%
+The idea here is that if either $u$ or $v$ is in the solution, the instance is equivalent to the one where
+$uv$ is strong.
+Otherwise, we can safely ignore $u$ and $v$.
+Notice that both (2a) and (2b) decrease the number of weak edges,
+ so the graph eventually becomes strong and the reduction rule \textbf{VC} will be applied.
+
+\textbf{Local search.} Once the solver finds a feasible solution,
+ it tries the following changes to see if there is a better solution:
+ (1) removing one vertex from solution and
+ (2) removing two vertices $u$ and $v$ from solution and add another vertex $w$.
+%
+Here, the candidates for $w$ can be found by two BFS;
+ after removing all vertices in the solution except $u$ and $v$,
+ $w$ must be in both the smallest cycle including $u$ and the smallest cycle including $v$.
+
+\vspace*{1em}
+
+The best guess (the one with the least solution size) along with its branching history
+ is kept for the second phase.
+
+% \enlargethispage{\baselineskip}
+
+%-------------------------------------------------------------------------------
+%
+%-------------------------------------------------------------------------------
+\subsection{Second Phase: Exhaustive Search}
+
+In the second phase, our solver runs a branch-and-bound procedure guided by the best guess (if such one exists).
+%
+Let us call the guess solution $S$.
+First, we seek the vertices $S' \subseteq S$ that are also in the exact solution as follows:
+for each $v \in S$, we compute the lower bound of the graph obtained by \textsf{ignore}($v$).
+If it is not less than $|S|$, we include $v$ in our exact solution.
+We use the same reduction rules throughout the algorithm.
+The lower-bound function involves the \textsc{Vertex Cover} solver and
+ ideas inspired by \cite{hen-ming_lin_computing_2000}.
+
+\textbf{Branching.} In this phase, the solver considers all branches.
+It chooses the strategy for the best guess, but tailored to the guess solution;
+ if there is a vertex or an edge used during the guess, we make the same decision in the same order.
+Otherwise, it picks a branch target as performed in the first phase.
+
+\textbf{Lower bounds.} At every search node, we compute a lower bound of the solution size as follows.
+Let $V_\text{strong} \subseteq V$ be the set of vertices incident to any strong edge.
+Then, a lower bound can be found by $\alpha + \beta$,
+ where $\alpha$ is the solution size of \textsc{Vertex Cover} with $G_\text{strong}$,
+ and $\beta$ is the (vertex-disjoint) cycle-packing number of $G - V_\text{strong}$.
+Packing is done with sampling. Randomly pick a vertex and obtain the shortest cycle by BFS.
+Remove the vertices forming that cycle and then repeat.
+%
+Reduction rules are repeatedly applied during the computation.
+
+%%
+%% Bibliography
+%%
+
+%% Please use bibtex, 
+
+\bibliography{pace-2022-description}
+
+\end{document}
