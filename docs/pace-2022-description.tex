@@ -82,9 +82,9 @@ Our solver heavily depends on the \textsc{Vertex Cover} solver \textsf{WeGotYouC
  as we observe that \textsc{DFVS} can be reduced to \textsc{Vertex Cover}
  if all edges in the given digraph are bidirected.
 %
-Further, our program comprises two solvers: the heuristic solver and the exact solver.
-The heuristic solver \textit{guesses} a high-quality feasible solution via random search,
- and the exact one performs an exhaustive branch-and-bound search guided by the \textit{guess} solution.
+Further, our program comprises two phases: the heuristic random search and the exhaustive search.
+The random search \textit{guesses} a high-quality feasible solution via heuristics,
+ and the exhaustive one performs a branch-and-bound search guided by the guess solution.
 \end{abstract}
 
 \section{Background}
@@ -93,8 +93,8 @@ The heuristic solver \textit{guesses} a high-quality feasible solution via rando
 In addition to standard graph-theoretic notation (e.g. found in \cite{diestel2017graph}),
  we define a few terms.
 Given a directed graph, or a \textit{digraph}, $G=(V,E)$,
- we say an edge $uv \in E$ is \textit{strong} if bidirected, i.e. $\{uv, vu\} \in E$,
- and otherwise, $uv$ is \textit{weak}.
+ we say an edge $uv \in E$ is \textit{strong} if bidirected, i.e. $\{uv, vu\} \in E$;
+ otherwise, $uv$ is \textit{weak}.
 Thus, $E$ is partitioned into strong edges, denoted by $E_\text{strong}$,
  and weak edges, denoted by $E_\text{weak}$.
 %
@@ -127,13 +127,13 @@ We relate those problems as follows.
 \end{proposition}
 
 We use \cref{thm:1} for two purposes: (1) finding the exact solution when $E_\text{weak}=\emptyset$ and
- (2) computing the lower-bound of the solution size otherwise.
+ (2) computing the lower-bound of the solution size.
 
 
 \section{Brief Description of Algorithm}
 
 Our solver iteratively applies reduction rules and performs two phases of computation.
-The first phase, or guess, aims to find the best solution quickly;
+The first phase guesses the best solution quickly;
  here, we use random search enhanced with local search.
 The second phase performs a branch-and-bound exhaustive search utilizing the guess solution as guidance.
 
@@ -182,10 +182,10 @@ Note that all reduction rules except \textbf{VC} can be performed in polynomial 
 %-------------------------------------------------------------------------------
 \subsection{First Phase: Random Search}
 
-In this phase, our solver iteratively picks a vertex or an edge and decides to include in solution or not
-(details in the branching section).
+In this phase, our solver iteratively picks a vertex or an edge and decides to include them
+ in solution or not (details in the branching section).
 The solver applies reduction rules every time the graph is modified.
-Once a feasible solution to the original instance has be found, it runs a local search to see
+Once a feasible solution to the original instance has been found, it runs a local search to see
  if there is a better solution.
 Different branching strategies and pseudorandom number generator seeds are tried until the time limit exceeds.
 
@@ -198,13 +198,12 @@ Then, with probability $\mu$, (1a) include $v$ in the solution and remove $v$, a
 
 The edge branching first picks a weak edge $uv \in E_\text{weak}$ such that
  $\sigma (\deg_{G_\text{weak}}(u) + \deg_{G_\text{weak}}(v))$ is minimized.
- Ties are broken randomly.
 Then, with probability $\mu$, (2a) add edge $vu$, and otherwise, (2b) ignore $u$ and $v$.
 %
 The idea here is that if either $u$ or $v$ is in the solution, the instance is equivalent to the one where
 $uv$ is strong.
 Otherwise, we can safely ignore $u$ and $v$.
-Notice that both (2a) and (2b) decreases the number of weak edges,
+Notice that both (2a) and (2b) decrease the number of weak edges,
  so the graph eventually becomes strong and the reduction rule \textbf{VC} will be applied.
 
 \textbf{Local search.} Once the solver finds a feasible solution,
@@ -219,10 +218,13 @@ Here, the candidates for $w$ can be found by two BFS;
 \vspace*{1em}
 
 The best guess (the one with the least solution size) along with its branching history
- is preserved for the second phase.
+ is kept for the second phase.
 
 % \enlargethispage{\baselineskip}
 
+%-------------------------------------------------------------------------------
+%
+%-------------------------------------------------------------------------------
 \subsection{Second Phase: Exhaustive Search}
 
 In the second phase, our solver runs a branch-and-bound procedure guided by the best guess (if such one exists).
@@ -232,12 +234,12 @@ First, we seek the vertices $S' \subseteq S$ that are also in the exact solution
 for each $v \in S$, we compute the lower bound of the graph obtained by \textsf{ignore}($v$).
 If it is not less than $|S|$, we include $v$ in our exact solution.
 We use the same reduction rules throughout the algorithm.
-The lower-bound function also involves the \textsc{Vertex Cover} solver and
+The lower-bound function involves the \textsc{Vertex Cover} solver and
  ideas inspired by \cite{hen-ming_lin_computing_2000}.
 
 \textbf{Branching.} In this phase, the solver considers all branches.
 It chooses the strategy for the best guess, but tailored to the guess solution;
- if there is a vertex or an edge used during the best guess, we make the same decision in the same order.
+ if there is a vertex or an edge used during the guess, we make the same decision in the same order.
 Otherwise, it picks a branch target as performed in the first phase.
 
 \textbf{Lower bounds.} At every search node, we compute a lower bound of the solution size as follows.
