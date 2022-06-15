@@ -8,7 +8,7 @@ This repository stores the source code of my solver for the Exact track of the [
 
 ### Solver Description
 
-- PDF: TBD
+- PDF: https://raw.githubusercontent.com/wiki/mogproject/dfvs-2022/pace-2022-description.pdf
 
 ### Dependencies
 
